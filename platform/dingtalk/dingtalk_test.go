@@ -60,12 +60,12 @@ func TestGetAccessToken_MutexExists(t *testing.T) {
 	}
 
 	// Test that we can lock/unlock the mutex
-	p.tokenMu.Lock()   //nolint:staticcheck // SA2001: verifying mutex is usable
-	p.tokenMu.Unlock()
+	p.tokenMu.Lock()
+	p.tokenMu.Unlock() //nolint:staticcheck // SA2001: verifying mutex is usable
 
 	// Test with defer
-	p.tokenMu.Lock()   //nolint:staticcheck // SA2001: verifying mutex is usable
-	defer p.tokenMu.Unlock()
+	p.tokenMu.Lock()
+	defer p.tokenMu.Unlock() //nolint:staticcheck // SA2001: verifying mutex is usable
 
 	t.Log("tokenMu mutex is functional")
 }
@@ -111,8 +111,8 @@ func TestPlatform_MutexFieldExists(t *testing.T) {
 	p := &Platform{}
 
 	// This test will fail to compile if tokenMu doesn't exist
-	p.tokenMu.Lock()   //nolint:staticcheck // SA2001: verifying mutex field exists
-	p.tokenMu.Unlock()
+	p.tokenMu.Lock()
+	p.tokenMu.Unlock() //nolint:staticcheck // SA2001: verifying mutex field exists
 
 	t.Log("Platform.tokenMu field exists")
 }

@@ -369,7 +369,7 @@ func (p *Platform) handleCallbackQuery(cb *tgbotapi.CallbackQuery) {
 		edit := tgbotapi.NewEditMessageText(chatID, msgID, origText+"\n\n"+choiceLabel)
 		emptyMarkup := tgbotapi.NewInlineKeyboardMarkup()
 		edit.ReplyMarkup = &emptyMarkup
-		p.bot.Send(edit)
+		_, _ = p.bot.Send(edit)
 
 		p.handler(p, &core.Message{
 			SessionKey: sessionKey,
@@ -415,7 +415,7 @@ func (p *Platform) handleCallbackQuery(cb *tgbotapi.CallbackQuery) {
 	edit := tgbotapi.NewEditMessageText(chatID, msgID, origText+"\n\n"+choiceLabel)
 	emptyMarkup := tgbotapi.NewInlineKeyboardMarkup()
 	edit.ReplyMarkup = &emptyMarkup
-	p.bot.Send(edit)
+	_, _ = p.bot.Send(edit)
 
 	p.handler(p, &core.Message{
 		SessionKey: sessionKey,
@@ -740,7 +740,7 @@ func (p *Platform) StartTyping(ctx context.Context, rctx any) (stop func()) {
 	}
 
 	action := tgbotapi.NewChatAction(rc.chatID, tgbotapi.ChatTyping)
-	p.bot.Send(action)
+	_, _ = p.bot.Send(action)
 
 	done := make(chan struct{})
 	go func() {
@@ -753,7 +753,7 @@ func (p *Platform) StartTyping(ctx context.Context, rctx any) (stop func()) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				p.bot.Send(action)
+				_, _ = p.bot.Send(action)
 			}
 		}
 	}()

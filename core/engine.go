@@ -56,7 +56,7 @@ type RestartRequest struct {
 // a "restart successful" message after startup.
 func SaveRestartNotify(dataDir string, req RestartRequest) error {
 	dir := filepath.Join(dataDir, "run")
-	os.MkdirAll(dir, 0o755)
+	_ = os.MkdirAll(dir, 0o755)
 	data, _ := json.Marshal(req)
 	return os.WriteFile(filepath.Join(dir, "restart_notify"), data, 0o644)
 }
