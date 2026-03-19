@@ -1445,7 +1445,6 @@ func parseInlineMarkdown(line string) []map[string]any {
 		pattern string
 		tag     string
 		style   string // for text elements with style
-		isLink  bool
 	}
 	markers := []markerDef{
 		{pattern: "**", tag: "text", style: "bold"},

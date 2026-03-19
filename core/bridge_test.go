@@ -474,9 +474,7 @@ func TestBridge_SessionList(t *testing.T) {
 
 	// List sessions for a new key — should create a default session
 	r := bridgeGet(t, baseURL+"/bridge/sessions?session_key=test:u1:u1&token=tok", "")
-	if !r.OK {
-		// No sessions yet, that's fine — list returns empty
-	}
+	// r.OK may be false if no sessions exist yet — that's expected.
 
 	// Create a session first
 	r = bridgePost(t, baseURL+"/bridge/sessions", "tok", map[string]string{

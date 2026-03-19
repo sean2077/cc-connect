@@ -1120,7 +1120,6 @@ type logRingBuffer struct {
 	entries []logEntry
 	size    int
 	pos     int
-	full    bool
 }
 
 type logEntry struct {

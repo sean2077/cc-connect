@@ -152,7 +152,7 @@ func (p *Platform) Start(handler core.MessageHandler) error {
 				rctx := replyContext{chatID: msg.Chat.ID, messageID: msg.MessageID}
 
 				// Handle photo messages
-				if msg.Photo != nil && len(msg.Photo) > 0 {
+				if len(msg.Photo) > 0 {
 					best := msg.Photo[len(msg.Photo)-1]
 					imgData, err := p.downloadFile(best.FileID)
 					if err != nil {
@@ -829,26 +829,6 @@ func extractEntityText(text string, offsetUTF16, lengthUTF16 int) string {
 	return string(utf16.Decode(encoded[offsetUTF16:endUTF16]))
 }
 
-// isValidTelegramCommand validates if a command string meets Telegram's requirements.
-// Telegram command rules:
-//   - 1-32 characters long
-//   - Only lowercase letters, digits, and underscores
-//   - Must start with a letter
-func isValidTelegramCommand(cmd string) bool {
-	if len(cmd) == 0 || len(cmd) > 32 {
-		return false
-	}
-	if cmd[0] < 'a' || cmd[0] > 'z' {
-		return false
-	}
-	for i := 1; i < len(cmd); i++ {
-		c := cmd[i]
-		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
-			return false
-		}
-	}
-	return true
-}
 
 // sanitizeTelegramCommand converts a command name to Telegram-compatible format.
 // Telegram rules: 1-32 chars, lowercase letters/digits/underscores, must start with a letter.

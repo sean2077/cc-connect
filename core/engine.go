@@ -5011,11 +5011,6 @@ func (e *Engine) sendAskQuestionPrompt(p Platform, replyCtx any, questions []Use
 		titleSuffix = fmt.Sprintf(" (%d/%d)", qIdx+1, total)
 	}
 
-	headerText := q.Header
-	if headerText == "" {
-		headerText = q.Question
-	}
-
 	// Try card (Feishu/Lark)
 	if supportsCards(p) {
 		cb := NewCard().Title(e.i18n.T(MsgAskQuestionTitle)+titleSuffix, "blue")
