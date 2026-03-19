@@ -127,7 +127,7 @@ func (s *CronStore) ToggleMute(id string) (newState bool, ok bool) {
 	for _, j := range s.jobs {
 		if j.ID == id {
 			j.Mute = !j.Mute
-			s.save()
+			_ = s.save()
 			return j.Mute, true
 		}
 	}
@@ -145,7 +145,7 @@ func (s *CronStore) MarkRun(id string, err error) {
 			} else {
 				j.LastError = ""
 			}
-			s.save()
+			_ = s.save()
 			return
 		}
 	}
@@ -516,7 +516,7 @@ func CronExprToHuman(expr string, lang Language) string {
 	if month != "*" {
 		if m, err := fmt.Sscanf(month, "%d", new(int)); err == nil && m == 1 {
 			var n int
-			fmt.Sscanf(month, "%d", &n)
+			_, _ = fmt.Sscanf(month, "%d", &n)
 			if n >= 1 && n <= 12 {
 				parts = append(parts, months[n])
 			}

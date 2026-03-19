@@ -223,7 +223,7 @@ func TestRenderCronCard_HasHint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store.Add(&CronJob{
+	_ = store.Add(&CronJob{
 		ID: "h1", Project: "test", SessionKey: "test:ch1",
 		CronExpr: "0 6 * * *", Prompt: "task", Enabled: true,
 		CreatedAt: time.Now(),
@@ -248,7 +248,7 @@ func TestExecuteCardAction_CronActions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store.Add(&CronJob{
+	_ = store.Add(&CronJob{
 		ID: "act1", Project: "test", SessionKey: "test:ch1",
 		CronExpr: "0 6 * * *", Prompt: "task", Enabled: true,
 		CreatedAt: time.Now(),
@@ -299,7 +299,7 @@ func TestCmdCronMute_TextCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store.Add(&CronJob{
+	_ = store.Add(&CronJob{
 		ID: "txt1", Project: "test", SessionKey: "test:ch1",
 		CronExpr: "0 6 * * *", Prompt: "task", Enabled: true,
 		CreatedAt: time.Now(),

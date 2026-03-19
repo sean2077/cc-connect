@@ -69,7 +69,7 @@ func TestQwenTTS_Success(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer apiServer.Close()
 
@@ -106,7 +106,7 @@ func TestQwenTTS_BusinessErrorCode(t *testing.T) {
 			"code":    "InvalidApiKey",
 			"message": "api key is invalid",
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer apiServer.Close()
 
@@ -126,7 +126,7 @@ func TestQwenTTS_EmptyAudioURL(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer apiServer.Close()
 
@@ -146,7 +146,7 @@ func TestQwenTTS_AudioDownloadFailed(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer apiServer.Close()
 
@@ -187,7 +187,7 @@ func TestOpenAITTS_Success(t *testing.T) {
 func TestOpenAITTS_APIError(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"bad request"}`))
+		_, _ = w.Write([]byte(`{"error":"bad request"}`))
 	}))
 	defer apiServer.Close()
 
@@ -243,7 +243,7 @@ func TestMiniMaxTTS_Success(t *testing.T) {
 func TestMiniMaxTTS_APIError(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("unauthorized"))
+		_, _ = w.Write([]byte("unauthorized"))
 	}))
 	defer apiServer.Close()
 
