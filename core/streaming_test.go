@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -213,6 +214,162 @@ func TestStreamPreview_FreezeDeletesOnFinish(t *testing.T) {
 	mp.mu.Unlock()
 	if deletedCount != 1 {
 		t.Errorf("expected 1 delete call, got %d", deletedCount)
+	}
+}
+
+// mockFailingUpdaterPlatform fails UpdateMessage after N successful calls.
+type mockFailingUpdaterPlatform struct {
+	stubPlatformEngine
+	mu            sync.Mutex
+	messages      []string
+	lastMsg       string
+	updateCalls   int
+	failAfterN    int // UpdateMessage fails after this many successful calls (0 = never fail)
+	alwaysFailUpd bool
+}
+
+func (m *mockFailingUpdaterPlatform) SendPreviewStart(_ context.Context, _ any, content string) (any, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.messages = append(m.messages, "start:"+content)
+	m.lastMsg = content
+	return "preview-handle", nil
+}
+
+func (m *mockFailingUpdaterPlatform) UpdateMessage(_ context.Context, _ any, content string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.updateCalls++
+	if m.alwaysFailUpd || (m.failAfterN > 0 && m.updateCalls > m.failAfterN) {
+		m.messages = append(m.messages, "update-fail:"+content)
+		return errors.New("mock update error")
+	}
+	m.messages = append(m.messages, "update:"+content)
+	m.lastMsg = content
+	return nil
+}
+
+func (m *mockFailingUpdaterPlatform) getMessages() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]string, len(m.messages))
+	copy(out, m.messages)
+	return out
+}
+
+// TestStreamPreview_FinishNoopUpdateTreatedAsSuccess verifies that when
+// UpdateMessage fails but the preview already shows the same text (e.g. Feishu
+// Patch API rejecting identical content), finish() returns true to prevent
+// the engine from sending a duplicate message via p.Send().
+func TestStreamPreview_FinishNoopUpdateTreatedAsSuccess(t *testing.T) {
+	mp := &mockFailingUpdaterPlatform{failAfterN: 1} // first UpdateMessage ok, second fails
+	cfg := StreamPreviewCfg{
+		Enabled:       true,
+		IntervalMs:    50,
+		MinDeltaChars: 1,
+		MaxChars:      500,
+	}
+
+	sp := newStreamPreview(cfg, mp, "ctx", context.Background())
+	sp.appendText("Hello World")
+	time.Sleep(100 * time.Millisecond) // let first flush (SendPreviewStart) happen
+
+	// Wait for timer to fire so UpdateMessage is called once (succeeds)
+	sp.appendText(" more")
+	time.Sleep(100 * time.Millisecond)
+
+	msgs := mp.getMessages()
+	// Should have: start + update
+	hasUpdate := false
+	var lastContent string
+	for _, m := range msgs {
+		if len(m) > 7 && m[:7] == "update:" {
+			hasUpdate = true
+			lastContent = m[7:]
+		}
+	}
+	if !hasUpdate {
+		t.Fatal("expected at least one successful UpdateMessage before testing finish")
+	}
+
+	// Now finish with the SAME text that was last sent via UpdateMessage.
+	// The second UpdateMessage call will fail, but since text matches
+	// lastSentText, finish() should return true.
+	ok := sp.finish(lastContent)
+	if !ok {
+		t.Error("finish should return true when UpdateMessage fails but content matches lastSentText")
+	}
+}
+
+// TestStreamPreview_DegradedContentMatchReturnsTrueWithoutCleaner verifies
+// that when a preview is degraded and the platform has no PreviewCleaner,
+// finish() returns true if the final text matches what was last sent —
+// preventing duplicate messages on platforms like Feishu.
+func TestStreamPreview_DegradedContentMatchReturnsTrueWithoutCleaner(t *testing.T) {
+	mp := &mockFailingUpdaterPlatform{failAfterN: 1}
+	cfg := StreamPreviewCfg{
+		Enabled:       true,
+		IntervalMs:    50,
+		MinDeltaChars: 1,
+		MaxChars:      500,
+	}
+
+	sp := newStreamPreview(cfg, mp, "ctx", context.Background())
+	sp.appendText("Hello World")
+	time.Sleep(100 * time.Millisecond)
+
+	// Freeze the preview (simulates a tool call / permission prompt)
+	// This updates the preview one last time and marks it degraded.
+	sp.freeze()
+
+	// finish with exactly the text that was last sent before freeze.
+	// Since degraded=true and no PreviewCleaner, but content matches,
+	// finish should return true.
+	ok := sp.finish("Hello World")
+	if !ok {
+		t.Error("finish should return true when degraded but content matches (no PreviewCleaner)")
+	}
+}
+
+// TestStreamPreview_DegradedRecoveryViaUpdateMessage verifies that when a
+// preview is degraded (without PreviewCleaner) and the final text differs
+// from what was displayed, finish() attempts a last-resort UpdateMessage
+// to recover the preview.
+func TestStreamPreview_DegradedRecoveryViaUpdateMessage(t *testing.T) {
+	// failAfterN=1: first UpdateMessage succeeds, second fails (causing degradation),
+	// but the third (recovery attempt in finish) should succeed because we reset.
+	mp := &mockFailingUpdaterPlatform{failAfterN: 100} // won't fail during test
+	cfg := StreamPreviewCfg{
+		Enabled:       true,
+		IntervalMs:    50,
+		MinDeltaChars: 1,
+		MaxChars:      500,
+	}
+
+	sp := newStreamPreview(cfg, mp, "ctx", context.Background())
+	sp.appendText("partial")
+	time.Sleep(100 * time.Millisecond)
+
+	// Manually degrade the preview to simulate a failed update during streaming
+	sp.mu.Lock()
+	sp.degraded = true
+	sp.mu.Unlock()
+
+	// finish with different text — should attempt recovery via UpdateMessage
+	ok := sp.finish("partial plus more text")
+	if !ok {
+		t.Error("finish should return true when degraded preview is recovered via UpdateMessage")
+	}
+
+	msgs := mp.getMessages()
+	found := false
+	for _, m := range msgs {
+		if m == "update:partial plus more text" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected recovery UpdateMessage, got messages: %v", msgs)
 	}
 }
 

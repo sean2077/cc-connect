@@ -255,6 +255,23 @@ func (sp *streamPreview) finish(finalText string) bool {
 			if cleaner, ok := sp.platform.(PreviewCleaner); ok {
 				slog.Debug("stream preview finish: deleting stale preview (degraded)")
 				_ = cleaner.DeletePreviewMessage(sp.ctx, sp.previewMsgID)
+			} else if finalText != "" && finalText == sp.lastSentText {
+				// The preview already shows the correct final text — no need
+				// to delete or resend. This avoids duplicates on platforms
+				// (e.g. Feishu) that update in-place without PreviewCleaner.
+				slog.Debug("stream preview finish: degraded but content matches, treating as success",
+					"text_len", len(finalText))
+				return true
+			} else if finalText != "" {
+				// Last resort: try updating the degraded preview with the
+				// final text. The earlier failure may have been transient.
+				if updater, ok := sp.platform.(MessageUpdater); ok {
+					if err := updater.UpdateMessage(sp.ctx, sp.previewMsgID, finalText); err == nil {
+						slog.Debug("stream preview finish: recovered degraded preview via UpdateMessage",
+							"text_len", len(finalText))
+						return true
+					}
+				}
 			}
 		}
 		slog.Debug("stream preview finish: no active preview", "hasHandle", sp.previewMsgID != nil, "degraded", sp.degraded)
@@ -298,6 +315,15 @@ func (sp *streamPreview) finish(finalText string) bool {
 		"text_len", len(finalText), "lastSent_len", len(sp.lastSentText),
 		"same", finalText == sp.lastSentText, "viaUpdate", sp.lastSentViaUpdate)
 	if err := updater.UpdateMessage(sp.ctx, sp.previewMsgID, finalText); err != nil {
+		// If the preview already shows the same text, the update failure is
+		// harmless — e.g. Feishu's Patch API rejects no-op updates with
+		// identical content. Treat this as success to avoid sending a
+		// duplicate message via the fallback p.Send() path.
+		if finalText == sp.lastSentText {
+			slog.Debug("stream preview finish: update failed but content already matches, treating as success",
+				"text_len", len(finalText), "error", err)
+			return true
+		}
 		slog.Debug("stream preview finish: final update FAILED, cleaning up preview", "error", err)
 		// Update failed (e.g. text too long for platform edit API).
 		// Try to delete the stale preview so caller can send a fresh message.
