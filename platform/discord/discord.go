@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -568,6 +569,49 @@ func (p *Platform) sendChannel(rc replyContext, content string) error {
 	}
 	return nil
 }
+
+// SendImage sends an image to the channel or interaction.
+// Implements core.ImageSender.
+func (p *Platform) SendImage(ctx context.Context, rctx any, img core.ImageAttachment) error {
+	name := img.FileName
+	if name == "" {
+		name = "image.png"
+	}
+	file := &discordgo.File{
+		Name:        name,
+		ContentType: img.MimeType,
+		Reader:      bytes.NewReader(img.Data),
+	}
+
+	switch rc := rctx.(type) {
+	case *interactionReplyCtx:
+		_, err := p.session.FollowupMessageCreate(rc.interaction, true, &discordgo.WebhookParams{
+			Files: []*discordgo.File{file},
+		})
+		if err != nil {
+			slog.Warn("discord: interaction image failed, falling back to channel message", "error", err)
+			_, err = p.session.ChannelMessageSendComplex(rc.channelID, &discordgo.MessageSend{
+				Files: []*discordgo.File{file},
+			})
+			if err != nil {
+				return fmt.Errorf("discord: send image fallback: %w", err)
+			}
+		}
+		return nil
+	case replyContext:
+		_, err := p.session.ChannelMessageSendComplex(rc.targetChannelID(), &discordgo.MessageSend{
+			Files: []*discordgo.File{file},
+		})
+		if err != nil {
+			return fmt.Errorf("discord: send image: %w", err)
+		}
+		return nil
+	default:
+		return fmt.Errorf("discord: SendImage: invalid reply context type %T", rctx)
+	}
+}
+
+var _ core.ImageSender = (*Platform)(nil)
 
 func (p *Platform) ReconstructReplyCtx(sessionKey string) (any, error) {
 	// discord:{channelID}:{userID} or discord:{threadID}
