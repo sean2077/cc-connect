@@ -1,4 +1,8 @@
+ifeq ($(OS),Windows_NT)
+APP        := cc-connect.exe
+else
 APP        := cc-connect
+endif
 MODULE     := github.com/chenhg5/cc-connect
 CMD        := ./cmd/cc-connect
 DIST       := dist
