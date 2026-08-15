@@ -404,6 +404,12 @@ cd cc-connect
 make build
 ```
 
+To install the binary into Go's configured binary directory (`GOBIN`, or the first `GOPATH/bin`):
+
+```bash
+make install
+```
+
 
 ### ⚙️ Configure
 

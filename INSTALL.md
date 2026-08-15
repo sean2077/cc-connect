@@ -67,6 +67,12 @@ make build
 # Binary will be at ./cc-connect
 ```
 
+To install it into Go's configured binary directory (`GOBIN`, or the first `GOPATH/bin`), run:
+
+```bash
+make install
+```
+
 ## Step 2: Install your AI Agent
 
 cc-connect supports multiple local coding agents. Install at least one:

@@ -403,6 +403,12 @@ cd cc-connect
 make build
 ```
 
+将二进制安装到 Go 配置的二进制目录（`GOBIN`，或第一个 `GOPATH/bin`）：
+
+```bash
+make install
+```
+
 
 ### ⚙️ 配置
 
