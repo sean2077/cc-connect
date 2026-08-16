@@ -1,5 +1,12 @@
 # CC-Connect Development Guide
 
+## Local sean-dev Delivery
+
+This section is local guidance for the `sean-dev` branch only; do not copy it into PR branches or worktrees.
+
+- For completed changes, use a dedicated `codex/*` worktree and open a pull request to `chenhg5/cc-connect` `main`.
+- Cherry-pick the resulting commit into local `sean-dev`, then run `make install` from `sean-dev`.
+
 ## Project Overview
 
 CC-Connect is a bridge that connects AI coding agents (Claude Code, Codex, Gemini CLI, Cursor, etc.) with messaging platforms (Feishu/Lark, Telegram, Discord, Slack, DingTalk, WeChat Work, QQ, LINE). Users interact with their coding agent through their preferred messaging app.
