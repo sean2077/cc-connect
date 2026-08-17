@@ -188,21 +188,20 @@ With cc-connect, you can bring Kimi CLI from your local machine into Feishu/Lark
 </p>
 
 
-## 🆕 What’s New in v1.3.3
+## 🆕 What's New in v1.5.0
 
-First stable of the 1.3.3 series — stabilizes beta.1 → beta.5 (≈ 235 PRs since v1.3.2) plus 7 post-beta fixes. Highlights:
+Stable release stabilizing v1.5.0-beta.1 → beta.5 (~93 commits since v1.4.1) — **five new platforms**, **Reasonix agent**, Feishu/Kimi/Pi hardening, and production P1 stability fixes.
 
-- **New agents** — Devin CLI, Google Antigravity (`agy`), GitHub Copilot CLI as first-class agents (#672, #1123, #865). Hardened Cursor / OpenCode / Qoder / Kimi / Pi coverage.
-- **Platform expansion** — QQ (OneBot) file send & receive (#323), QQ Bot inline keyboards (#1131), WeCom `SendFile` in WebSocket (#1199), Feishu audio + video native media (#1202), Slack Assistant API (#844), MAX webhook delivery (#818), DingTalk @mentions / richText / image / file inbound (#1188, #828, #1357), broader Weibo DM, WPS Xiezuo (金山协作).
-- **Long-running turn hardening** — new `max_turn_time_mins` wall-clock cap with soft-stop + force-kill + auto-resume so a long bash / test command can no longer lock a session indefinitely (#1091).
-- **New core commands** — `/timer` (one-shot delayed task), `/cancel` (interrupt current turn), `/ps` (replaces `/btw`, kept as alias), `cron add --silent`, agent-driven TTS.
-- **Multi-user / permissions** — reply-to-unauthorized-IM-senders option, `@Bot/permit` ≡ `/permit` keyword matching, Bridge requires token when enabled.
-- **Provider ecosystem** — NekoCode, VisionCoder, AIHubMix, MiniMax M3 presets; Claude Code 1M-context Opus + `append_system_prompt` + PermissionRequest hooks; Codex `request_user_input` app-server events; configurable `shell` + shell profile for `exec`.
-- **Observability** — blackbox testing framework (P0/P1/P2 + config-switch matrix), CUJ test framework, provider-resume regression suite for codex/opencode/kimi, Pi context-usage reporter in reply footer.
+- **New platforms** — **Tencent Yuanbao** (#1445); **cloud_web** self-hosted IM gateway (#1282); **Google Chat** (#1424); **WPS Agentspace** (#1439); **Tuitui** (#849).
+- **New agent** — **Reasonix** HTTP serve API with default/yolo/plan permission modes (#1281).
+- **Feishu** — topic workspace isolation (#1551); quoted file on-demand download (#1588); first thread mention bootstrap (#1627); cross-type image batch flush (#1693).
+- **Kimi & Pi** — native Kimi Code CLI dialect (#1564); Pi v0.84.0 toolcall_end + willRetry (#1674, #1597); Pi RPC mode (#1440).
+- **Core stability** — `/restart` panic recovery; idle close race fixes; codex gpt-5.x in `/model` (#1546); Claude Code session title fallback (#1549); Weixin send budget (#1643).
+- **`agent_session_idle_timeout_mins`** — close idle agent processes while preserving session for resume (#1338).
 
-⚠️ **Behavior changes (action may be required)**: Telegram/Discord `progress_style` defaults to `compact` (set `legacy` to revert); QQ Bot default `intents` now include `INTERACTION_CREATE` (custom values must include `1<<26`); DingTalk `msgtype=file` inbound now reaches the agent; engine permission keywords are @mention-tolerant; `reset_on_idle_mins` defaults to 30 min; Bridge with no token configured refuses to start. See `changelogs/v1.3.3.md` for the full themed summary.
+⚠️ **Upgrade notes**: No breaking changes. All new config options are optional with safe defaults. v1.4.1 configs upgrade as-is.
 
-No breaking changes. Coming from a v1.3.3-beta.*, this is a small fix-only upgrade.
+Full summary: `changelogs/v1.5.0.md`.
 
 
 ## 🧩 Platform feature snapshot

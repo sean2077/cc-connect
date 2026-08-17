@@ -4,40 +4,139 @@
 
 ### Added
 - **codex**: support `max` reasoning effort in project configuration and through `/reasoning max` (#1683).
-- **`agent_session_idle_timeout_mins`**: new per-project config option that closes an idle live agent process after a clean turn while preserving the cc-connect session and saved agent session ID. The next message starts a new agent process and resumes the same conversation. Set to `0` or leave unset to disable (#1338).
-- **Reasonix agent**: new agent adapter for Reasonix multi-model coding agent, bridging via HTTP serve API (POST /submit, SSE /events, POST /approve). Supports default/yolo/plan permission modes, SSE auto-reconnect with backoff, and thinking accumulator. (#1281)
-- **cloud_web platform**: 新增 self-hosted IM Gateway 作为 first-class platform 接入 (CWIP v1 协议,支持 websocket / long_poll / gateway 3 种 transport,完整 inbound/outbound + capability negotiation + graceful degradation)。 详见 docs/cloud-web.md + #1282。
 
-## Unreleased
+## v1.5.0 (2026-08-16)
 
-### Added
-- **Feishu: outbound bot-to-bot @mention resolution** via new `mention_map` config option. Maps agent-friendly names (e.g. `BOT-A`) to Feishu open_ids so that when an agent writes `@BOT-A` in its reply, cc-connect converts it to a native Feishu `<at>` tag that triggers a real notification. Layered on top of `resolve_mentions` (group-member matching) with higher priority, so explicit config always wins (#1322).
+First stable release of the v1.5.0 series since v1.4.1. Stabilizes beta.1 → beta.5 (~93 commits) including production P1 fixes (#1693 / #1686).
 
-### Fixed
-- **codex**: `/model` chooser now surfaces `gpt-5.x` (and any future frontier chat model) when the model list is populated by fetching `GET /v1/models` from the provider. The previous hard-coded 11-entry allowlist (`o1/o3/o4/gpt-4o/gpt-4.1/codex-mini-latest`) had not been updated since 2026-03 and silently filtered out every `gpt-5*` variant (including `gpt-5.6-sol/terra/luna`) returned by the API, so users on `codex-cli >= 0.143` could not pick GPT-5.6 in cc-connect even after upgrading the CLI. The allowlist is replaced with pattern rules: accept the `gpt-*` / `chatgpt-*` / `codex-*` / `o1-*` / `o3-*` / `o4-*` / `o5-*` families plus the bare `o1/o3/o4/o5` IDs, and reject non-chat modalities (`embedding`, `whisper`, `tts`, `dall-e`, `audio-preview`, `realtime`, `transcribe`, `moderation`, `image`, `search-preview`). New frontier chat models are picked up automatically without a code change. Note: this only affects the API-fetch fallback path; users with an explicit `model_catalog_json` in `~/.codex/config.toml` or a `models = [...]` list in cc-connect's provider config were unaffected.
-- **Feishu recall fallback probes**: throttle repeated active-message recall checks so long-running turns do not continuously call platform message APIs.
-- **Skill discovery depth-1 only**: skill scanning no longer recurses into subdirectories. Only `<skill_dir>/<name>/SKILL.md` is registered; nested SKILL.md files (e.g. inside `<name>/references/...`) are treated as skill assets and ignored, matching the Claude Code CLI convention. Previously, nested SKILL.md files leaked into platform command menus as phantom slash commands (101 leaked commands from `frontend-design` skill alone) (#1304).
-- **Feishu: tighter `@` mention detection in `SendWithStatusFooter` / `buildReplyContent`** — a bare `@` inside an email address, URL, or escaped character no longer false-positives as a mention. Mention detection now checks for the resolved `<at user_id="...">` tag instead of a substring match, so card rendering (and the notation-style status footer) is preserved for content that merely contains `@`. Real `@mentions` still force `MsgTypeText` so Feishu fires the mention event (#1322).
-- **feishu**: coalesce consecutive image messages from the same session into a single multi-image dispatch to fix first-image drop on batch sends (#1395). When the Feishu mobile client sends N images in quick succession, each image arrives as a separate `image` event with very close `create_time` values. Dispatching each immediately caused core/engine's `create_time` watermark (PR #1168) to drop the oldest image, so the agent only saw N-1 images. A per-session image buffer with a 150ms quiet window now merges the burst into one `core.Message` carrying all images, in send order. Single-image sends and quoted-image replies are unaffected.
-- **claudecode**: fix per-spawn system-prompt temp file EACCES under `run_as_user` (#1429). The per-spawn temp file written by `writeTempAppendPromptFile` (the 1% edge-case path used when the prompt has session-specific platform formatting or user `append_system_prompt`) inherited `os.CreateTemp`'s 0600 mode and was owned by the cc-connect process user (often root under systemd). When the agent was spawned under a different `run_as_user`, it could not read the file and exited before any prompt was loaded. The file is now `chmod 0o644` immediately after write, matching the shared `ensureSharedSystemPromptFile` path. Prompt content is non-secret (a superset of the already-shared base prompt), so 0644 is consistent with the shared file. Does not affect the shared-file path (already 0644 since #1376) or the daemon-mode path resolution (#1419).
-- **kimi**: gate `--work-dir` flag on `kimiFlagSupport.WorkDir` so the Kimi Code CLI build that dropped the flag no longer exits with `error: unknown option --work-dir` (#1476). Same probe-based pattern as the `--print` fix in #1456 / PR #1461: the agent probes `kimi --help` once at construction, then `buildArgs` emits the flag only when the installed CLI advertises it. The agent still runs in the correct directory because `exec.Command.Dir` is set separately, so legacy kimi-cli users (who still have `--work-dir`) keep non-default workspace support while modern-CLI users get clean startup.
-- **core**: queue post-restart notification and dispatch on platform ready (#1383). Previously `/restart` sent the success notification immediately after engine startup, racing the platform's async connect window (Telegram: ~2.6s). On a not-yet-ready platform the send was silently dropped at debug log level. The notify is now queued on the engine and dispatched when the target platform reaches `OnPlatformReady`, with bounded retry (3 attempts, 0/500/1500 ms backoff) on transient send failure. Failed sends log at warn level. A 10s safety timeout drops the notify with a warning if the target platform never reaches ready, so startup is never blocked indefinitely. Also covers Discord / Weixin / Matrix (other AsyncRecoverablePlatform implementations) for free.
-- **core**: `SaveFilesToDisk` / `AppendFileRefs` always emit absolute paths (#1459). When a user configured a relative `work_dir` (e.g. `~/project` or `.cc-connect`), `SaveFilesToDisk` joined relative paths into the attachments directory and the resulting paths were passed verbatim into the agent's prompt. The spawned agent process — typically run from a different cwd by the platform adapter — could not resolve them and silently dropped every attachment. `SaveFilesToDisk` now calls `filepath.Abs(workDir)` up front and falls back to the raw value on error, and `AppendFileRefs` defensively absolutizes each entry. Both behaviors are covered by new tests for relative, absolute, and empty workDir; the empty-workDir case falls back to the process cwd so misconfigured deploys still get a writable attachments directory.
+See `changelogs/v1.5.0.md` for the full themed summary.
 
-- **core**: prevent same-name file attachments from overwriting each other. `SaveFilesToDisk` now scopes files by message ID, keeps duplicate names distinct within one message, and uses an atomic no-overwrite fallback for legacy callers without a message ID (#1552).
+### New Platforms
+- **Tencent Yuanbao Bot API** (#1445), **cloud_web** IM gateway (#1282), **Google Chat** (#1424), **WPS Agentspace** (#1439), **Tuitui** (#849).
 
-## Unreleased
+### New Agents
+- **Reasonix** HTTP serve API adapter (#1281).
+
+### Features
+- **Feishu topic workspace isolation** (#1551), **quoted file download** (#1588), **first thread bootstrap** (#1627).
+- **Kimi Code CLI native dialect** (#1564), **Pi RPC + retry/toolcall fixes** (#1440, #1597, #1674).
+- **`agent_session_idle_timeout_mins`** (#1338), **admin-gated exec commands** (#1036).
 
 ### Fixed
-- **/model switch confirmation copy**: `MsgModelChanged` now explicitly states the
-  new model applies to the current session and all future sessions, removing the
-  misleading "new sessions" wording that made users think they needed `/new` to
-  see the change take effect (#1368).
+- **#1686 P1 stability** — restart recover, cross-type image flush, idle close race (#1693).
+- **codex `/model` gpt-5.x** (#1546), **Claude Code session titles** (#1549), **Weixin send budget** (#1643), **attachment collisions** (#1557), and 30+ additional fixes from beta cycle.
 
-## Unreleased
+## v1.5.0-beta.5 (2026-08-16)
+
+Rolling beta with **1 commit** on top of beta.4: P1 stability fixes from beta.3 QA (#1686).
+
+See `changelogs/v1.5.0-beta.5.md` for details.
 
 ### Fixed
-- **DingTalk message list title**: derive the `markdown.title` field on outgoing DingTalk messages from the message content (markdown stripped, first non-empty line, truncated to 20 runes) instead of the hardcoded `"reply"`. The DingTalk chat list now shows the actual reply preview instead of "reply" on every entry. Empty / pure-format / pure-emoji messages still fall back to "reply" so the title is never blank (#1269).
+- **Restart-notify panic recovery** — `defer recover()` in restart-notify goroutine prevents daemon crash (#1693).
+- **Cross-type image batch flush** — flush pending image batch before non-image dispatch to prevent image loss (#1693).
+- **Idle close race fixes** — re-arm timer on background turns; schedule before drain (#1693).
+
+## v1.5.0-beta.4 (2026-08-16)
+
+Rolling beta with **6 commits** merged from `main` since beta.3. Kimi Code CLI dialect + Pi retry/toolcall fixes + WeCom quote context.
+
+See `changelogs/v1.5.0-beta.4.md` for details.
+
+### Features
+- **Kimi Code CLI native dialect** — probe-gated flags, modern resume, dual stream parser, session listing (#1564 fixing #1561).
+
+### Fixed
+- **Kimi `--work-dir` flag gating** — probe before emit (#1483 fixing #1476).
+- **Pi willRetry turn continuity** — keep turn open during auto-retry (#1597).
+- **Pi v0.84.0 toolcall_end** — handle events without cumulative message (#1674).
+- **WeCom quoted message context** (#1669).
+- **Web admin work_dir validation** (#1572).
+
+## v1.5.0-beta.3 (2026-08-14)
+
+Rolling beta with **36 commits** merged from `main` since beta.2. Owner requested beta.3 (not direct stable) — beta.2 is ~1 month old and many fixes/features landed on main.
+
+See `changelogs/v1.5.0-beta.3.md` for the full themed summary.
+
+### New Platforms
+- **Google Chat** — first-class platform adapter (#1424).
+- **WPS Agentspace** — auto-login and token encryption (#1439).
+- **Tuitui** — platform support (#849).
+
+### Features
+- **Feishu topic workspace isolation** (#1551 fixing #1543).
+- **Feishu quoted file on-demand download** (#1588).
+- **Feishu first thread mention bootstrap** (#1627).
+- **DingTalk chat-list title from content** (#1288).
+- **Antigravity tool permissions bridge** (#1328).
+- **Admin-gated exec commands** — `/commands addexec` and `/cron addexec` behind `admin_from` (#1036).
+- **Pi permission mode env injection** (#1637).
+- **Agent cmd TOML array form** (#1673 fixing #1670).
+- **sonnet[1m] fallback model** (#1107).
+
+### Fixed
+- **Weixin send budget ret=-2** — fail fast per-account (#1643).
+- **Web admin agent-type-aware permission modes** (#1251).
+- **Pi models-store.json fallback** (#1636).
+- **Core code fence split** (#1630).
+- **Core tool_max_len in card mode** (#1257).
+- **DingTalk @userid extraction** (#1250).
+- **Attachment filename collisions** (#1557).
+- **Claude Code session title fallback** (#1549).
+- **Claude Code missing work_dir detection** (#1425).
+- **Antigravity session resume** (#1584).
+- **Usage 7-day window duplicate render** (#1583).
+- **i18n /model switch copy** (#1373).
+- **CLI reject unknown commands** (#353).
+- **Daemon CheckLinger stub on non-Linux** (#1093).
+- **Kimi preset global/China split**.
+- **cloud-web IPv6 test fix** (#1646).
+
+## v1.5.0-beta.2 (2026-07-14)
+
+Rolling beta with 1 commit on top of beta.1: codex `/model` gpt-5.x visibility fix. Owner requested beta.2 (not direct stable) after E2E validation.
+
+See `changelogs/v1.5.0-beta.2.md` for details.
+
+### Fixed
+- **codex `/model` gpt-5.x visibility** — replace stale 11-entry `openaiChatModels` static allowlist (unchanged since 2026-03) with prefix pattern matching (`gpt-*`, `chatgpt-*`, `codex-*`, `o1-*`, `o3-*`, `o4-*`, `o5-*`) plus non-chat modality exclusions. Users on codex-cli ≥ 0.143 fetching models via API could not select `gpt-5.6-sol/terra/luna` etc. Users with explicit `model_catalog_json` or provider `models = [...]` config unaffected (#1546 fixing user report, cherry-pick #1547, @chenhg5).
+
+## v1.5.0-beta.1 (2026-07-06)
+
+First beta of the v1.5.0 series since v1.4.1 stable. **Three new integration surfaces** join the family: Tencent Yuanbao Bot API, self-hosted `cloud_web` IM gateway (CWIP v1), and the Reasonix agent adapter — plus Pi RPC mode, Russian i18n, per-session agent idle timeout, and a batch of platform/core fixes.
+
+See `changelogs/v1.5.0-beta.1.md` for the full themed summary with credits.
+
+### New Platforms
+- **Tencent Yuanbao Bot API** — first-class Yuanbao platform adapter (#1445, @skyblue).
+- **cloud_web** — self-hosted IM gateway platform (CWIP v1 protocol; websocket / long_poll / gateway transports). See `docs/cloud-web.md` (#1282, @jiagou123).
+
+### New Agents
+- **Reasonix** — HTTP serve API adapter (POST /submit, SSE /events, POST /approve) with default/yolo/plan permission modes (#1281, @mchenziyi).
+
+### Features
+- **`agent_session_idle_timeout_mins`** — per-project config to close idle live agent processes after a clean turn while preserving session + saved agent session ID; next message resumes the same conversation (#1338, @hl1221hl).
+- **Pi RPC mode** — RPC mode with `extension_ui` permission forwarding (#1440, @happyTonakai).
+- **Feishu `mention_map`** — outbound bot-to-bot `@` resolution via configurable name → open_id mapping (#1341 fixing #1322, @generspooler).
+- **Feishu relay** — route inter-bot visibility echoes back into caller's Feishu thread (#1413, @zhangshuaimk-boop).
+- **Russian (ru) i18n** — Web admin UI Russian locale (#1449, @sonsay).
+
+### Fixed
+- **display**: hide agent footer lines in progress output (#1416, @AaronZ345).
+- **core**: resume stream preview after permission prompt resolves (#1451, @happyTonakai).
+- **core**: always emit absolute paths from `SaveFilesToDisk` / `AppendFileRefs` — fixes relative `work_dir` attachments silently dropped by agent (#1462 fixing #1459, @chenhg5).
+- **core**: create queue placeholder before session lock — prevents concurrent message queue miss (#1389, @xxb).
+- **codex**: time out blocked app-server writes (#1448, @AaronZ345).
+- **slack**: suppress `NO_REPLY` marker on streaming-card silent replies (#1397, @spinsirr).
+
+## v1.4.1 (2026-06-28)
+
+Patch release: Kimi CLI `--print` compatibility (#1461 fixing #1456). See `changelogs/v1.4.1.md`.
+
+## v1.4.0 (2026-06-28)
+
+Stable release: Webex + Matrix E2EE platforms, agent option parsing refactor (#1297), 30+ fixes. See `changelogs/v1.4.0.md`.
 
 ## v1.3.3 (2026-06-15)
 

@@ -187,21 +187,20 @@
 </p>
 
 
-## 🆕 v1.3.3 更新了什么
+## 🆕 v1.5.0 更新了什么
 
-1.3.3 系列首个正式版 —— 把 beta.1 → beta.5（自 v1.3.2 起约 235 个 PR）与 7 个 post-beta 修复一并稳定下来。亮点：
+v1.5.0 正式版 —— 自 v1.4.1 起稳定化 beta.1 → beta.5（约 93 个 commit），**五个新平台**、**Reasonix agent**、飞书/Kimi/Pi 强化及生产 P1 稳定性修复。
 
-- **新增 Agent** — Devin CLI、Google Antigravity (`agy`)、GitHub Copilot CLI 均为一等公民 agent (#672, #1123, #865)；Cursor / OpenCode / Qoder / Kimi / Pi 覆盖大幅加强。
-- **平台能力扩展** — QQ (OneBot) 文件收发 (#323)、QQ Bot 内联键盘 (#1131)、企业微信 WebSocket `SendFile` (#1199)、飞书原生音视频附件 (#1202)、Slack Assistant API (#844)、MAX webhook 投递模式 (#818)、钉钉 @mention / richText / 图片 / 文件入站 (#1188, #828, #1357)、微博私信能力扩充、WPS 协作（金山协作）。
-- **长任务保护** — 新增 `max_turn_time_mins` 绝对墙钟上限，软停 + 强杀 + 下一条消息自动 `--resume`，避免长跑的 bash / test 命令把 session 永久锁住 (#1091)。
-- **新核心命令** — `/timer`（一次性延时任务）、`/cancel`（中断当前 turn）、`/ps`（替代 `/btw`，`/btw` 保留为别名）、`cron add --silent`、agent 主动 TTS 输出。
-- **多用户 / 权限** — 可选「回复未授权 IM 发件人」、`@Bot/permit` ≡ `/permit` 关键字匹配、Bridge 启用时必须配置 token。
-- **Provider 生态** — 新增 NekoCode、VisionCoder、AIHubMix、MiniMax M3 预设；Claude Code 1M-context Opus + `append_system_prompt` + PermissionRequest hooks；Codex `request_user_input` app-server 事件；可配置 `shell` 与 shell profile。
-- **可观测性** — Blackbox 测试框架（P0/P1/P2 + config-switch 矩阵）、CUJ 测试框架、codex/opencode/kimi 的 provider-resume 回归套件、Pi 在 reply footer 输出 context 用量。
+- **新增平台** — **腾讯元宝** (#1445)；**cloud_web** 自托管 IM Gateway (#1282)；**Google Chat** (#1424)；**WPS Agentspace** (#1439)；**Tuitui** (#849)。
+- **新增 Agent** — **Reasonix** HTTP serve API，支持 default/yolo/plan 权限模式 (#1281)。
+- **飞书** — 话题 workspace 隔离 (#1551)；引用文件按需下载 (#1588)；首次进话题 bootstrap (#1627)；跨类型图片 batch flush (#1693)。
+- **Kimi & Pi** — Kimi Code CLI 原生方言 (#1564)；Pi v0.84.0 toolcall_end + willRetry (#1674, #1597)；Pi RPC 模式 (#1440)。
+- **核心稳定性** — `/restart` panic 恢复；idle close 竞态修复；codex gpt-5.x `/model` (#1546)；Claude Code 会话标题 (#1549)；微信 send budget (#1643)。
+- **`agent_session_idle_timeout_mins`** — 空闲 agent 进程自动关闭，保留 session 供 resume (#1338)。
 
-⚠️ **行为变更（可能需要改配置）**：Telegram / Discord `progress_style` 默认值改为 `compact`（设回 `legacy` 可还原）；QQ Bot 默认 `intents` 现在包含 `INTERACTION_CREATE`，若自定义 `intents` 需手动包含 `1<<26`；钉钉 `msgtype=file` 入站现在送达 agent；引擎权限关键字容忍 @mention；`reset_on_idle_mins` 默认值改为 30 分钟；Bridge 未配置 token 时拒绝启动。完整主题汇总见 `changelogs/v1.3.3.md`。
+⚠️ **升级提示**：无 breaking change。所有新配置项均为可选且有安全默认值。v1.4.1 配置可直接升级。
 
-无任何破坏性变更（No breaking changes）。从任意 v1.3.3-beta.\* 升级到 v1.3.3 是 fix-only 的小升级。
+完整汇总见 `changelogs/v1.5.0.md`。
 
 
 ## 🧩 平台能力一览
