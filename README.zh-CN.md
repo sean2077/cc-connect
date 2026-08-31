@@ -79,6 +79,11 @@
 </tr>
 
 <tr>
+<td width="150"><a href="https://go.apimart.ai/gh-cc-connect"><img src="assets/sponsors/apimart.png" alt="APIMart" width="120"></a></td>
+<td>感谢 APIMart 赞助本项目！APIMart 是专注 AI 图片/视频生成的低价 API 平台，GPT-Image-2 低至 $0.006/张，1 美元可出图 160+ 张。图片、视频一套异步 API 通吃，提交任务拿 ID、回调取结果，跑批万张不超时、换模型不改代码。按量付费、无月费，通过 <a href="https://go.apimart.ai/gh-cc-connect">此注册链接</a> 注册即可开用。</td>
+</tr>
+
+<tr>
 <td width="150"><a href="https://www.dmxapi.cn/register?aff=NDln"><img src="assets/sponsors/dmx-zh.jpeg" alt="DMXAPI" width="120"></a></td>
 <td>感谢 DMXAPI（大模型API）赞助本项目！DMXAPI，一个 Key 用全球大模型。为 200+ 企业用户提供全球大模型 API 服务。充值即开票、当天开票、并发不限制、1元起充、7x24 在线技术辅导。GPT/Claude/Gemini 全部 6.8 折，国内模型 5~8 折，Claude Code 专属模型 3.4 折进行中！<a href="https://www.dmxapi.cn/register?aff=NDln">点击这里注册</a></td>
 </tr>
@@ -187,20 +192,19 @@
 </p>
 
 
-## 🆕 v1.5.0 更新了什么
+## 🆕 v1.5.1-beta.1 更新了什么
 
-v1.5.0 正式版 —— 自 v1.4.1 起稳定化 beta.1 → beta.5（约 93 个 commit），**五个新平台**、**Reasonix agent**、飞书/Kimi/Pi 强化及生产 P1 稳定性修复。
+自 v1.5.0 正式版以来的 beta —— 16 个已合并 PR。亮点：
 
-- **新增平台** — **腾讯元宝** (#1445)；**cloud_web** 自托管 IM Gateway (#1282)；**Google Chat** (#1424)；**WPS Agentspace** (#1439)；**Tuitui** (#849)。
-- **新增 Agent** — **Reasonix** HTTP serve API，支持 default/yolo/plan 权限模式 (#1281)。
-- **飞书** — 话题 workspace 隔离 (#1551)；引用文件按需下载 (#1588)；首次进话题 bootstrap (#1627)；跨类型图片 batch flush (#1693)。
-- **Kimi & Pi** — Kimi Code CLI 原生方言 (#1564)；Pi v0.84.0 toolcall_end + willRetry (#1674, #1597)；Pi RPC 模式 (#1440)。
-- **核心稳定性** — `/restart` panic 恢复；idle close 竞态修复；codex gpt-5.x `/model` (#1546)；Claude Code 会话标题 (#1549)；微信 send budget (#1643)。
-- **`agent_session_idle_timeout_mins`** — 空闲 agent 进程自动关闭，保留 session 供 resume (#1338)。
+- **i18n** — 按 language 配置本地化 agent system prompt（cron/timer/send/relay）(#1721)。
+- **Cursor** — 图片附件通过 on-disk path 传给 Cursor CLI (#1709)。
+- **飞书** — 大文件 HTTP Range 分块下载，绕过 code=234037 (#1746)；bot open_id 发现失败 fail-closed (#1725)。
+- **微信** — 回复/推送分路径 send budget (#1743)；入站 dedup 可配置 (#1733)。
+- **Claude Code** — 移除 `--replay-user-messages`，恢复 `/compact` 等 slash 命令 (#1737)；session teardown 竞态修复 (#1714)。
+- **Codex** — 传播 app-server turn 失败 (#1730)；支持 max reasoning effort (#1727)；`/list` 正确读 session 名 (#1639)。
+- **Pi** — 附件 @path 引用而非 inline bytes (#1724)；Windows 编译修复 (#1738)。
 
-⚠️ **升级提示**：无 breaking change。所有新配置项均为可选且有安全默认值。v1.4.1 配置可直接升级。
-
-完整汇总见 `changelogs/v1.5.0.md`。
+无任何破坏性变更。完整 changelog 见 `changelogs/v1.5.1-beta.1.md`。
 
 
 ## 🧩 平台能力一览
@@ -400,12 +404,6 @@ sudo mv cc-connect /usr/local/bin/
 git clone https://github.com/chenhg5/cc-connect.git
 cd cc-connect
 make build
-```
-
-将二进制安装到 Go 配置的二进制目录（`GOBIN`，或第一个 `GOPATH/bin`）：
-
-```bash
-make install
 ```
 
 

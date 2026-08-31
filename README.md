@@ -79,6 +79,11 @@ With cc-connect, you can bring Kimi CLI from your local machine into Feishu/Lark
 </tr>
 
 <tr>
+<td width="150"><a href="https://go.apimart.ai/gh-cc-connect"><img src="assets/sponsors/apimart.png" alt="APIMart" width="120"></a></td>
+<td>Thanks to APIMart for sponsoring this project! APIMart is a low-cost API platform for AI image & video generation — GPT-Image-2 from $0.006/image, 160+ images per dollar. One async API covers both image and video: submit a task, get an ID, fetch results via polling or callback. Batch tens of thousands of images without timeouts, switch models without changing code. Pay-as-you-go with no monthly fee — <a href="https://go.apimart.ai/gh-cc-connect">sign up here</a> to get started.</td>
+</tr>
+
+<tr>
 <td width="150"><a href="https://www.dmxapi.cn/register?aff=NDln"><img src="assets/sponsors/dmx-en.jpg" alt="DMXAPI" width="120"></a></td>
 <td>Thanks to DMXAPI for sponsoring this project! DMXAPI provides global large model API services to 200+ enterprise users. One API key for all global models. Features include: instant invoicing, unlimited concurrency, starting from $0.15, 24/7 technical support. GPT/Claude/Gemini all at 32% off, domestic models 20-50% off, Claude Code exclusive models at 66% off! Register via <a href="https://www.dmxapi.cn/register?aff=NDln">this link</a>.</td>
 </tr>
@@ -188,20 +193,19 @@ With cc-connect, you can bring Kimi CLI from your local machine into Feishu/Lark
 </p>
 
 
-## 🆕 What's New in v1.5.0
+## 🆕 What’s New in v1.5.1-beta.1
 
-Stable release stabilizing v1.5.0-beta.1 → beta.5 (~93 commits since v1.4.1) — **five new platforms**, **Reasonix agent**, Feishu/Kimi/Pi hardening, and production P1 stability fixes.
+Beta since v1.5.0 stable — 16 merged PRs. Highlights:
 
-- **New platforms** — **Tencent Yuanbao** (#1445); **cloud_web** self-hosted IM gateway (#1282); **Google Chat** (#1424); **WPS Agentspace** (#1439); **Tuitui** (#849).
-- **New agent** — **Reasonix** HTTP serve API with default/yolo/plan permission modes (#1281).
-- **Feishu** — topic workspace isolation (#1551); quoted file on-demand download (#1588); first thread mention bootstrap (#1627); cross-type image batch flush (#1693).
-- **Kimi & Pi** — native Kimi Code CLI dialect (#1564); Pi v0.84.0 toolcall_end + willRetry (#1674, #1597); Pi RPC mode (#1440).
-- **Core stability** — `/restart` panic recovery; idle close race fixes; codex gpt-5.x in `/model` (#1546); Claude Code session title fallback (#1549); Weixin send budget (#1643).
-- **`agent_session_idle_timeout_mins`** — close idle agent processes while preserving session for resume (#1338).
+- **i18n** — Localize agent system prompts (cron/timer/send/relay) based on language config (#1721).
+- **Cursor** — Image attachments delivered via on-disk paths to the Cursor CLI (#1709).
+- **Feishu** — Large file download via HTTP Range chunks, bypassing code=234037 (#1746); fail-closed when bot open_id discovery fails (#1725).
+- **Weixin** — Reply and push paths now have separate send budgets (#1743); inbound dedup is configurable (#1733).
+- **Claude Code** — `/compact` and slash commands restored by dropping `--replay-user-messages` (#1737); bounded session teardown (#1714).
+- **Codex** — Failed app-server turns propagate (#1730); max reasoning effort supported (#1727); `/list` reads session names correctly (#1639).
+- **Pi** — Attachments passed as `@path` refs (#1724); Windows build fix (#1738).
 
-⚠️ **Upgrade notes**: No breaking changes. All new config options are optional with safe defaults. v1.4.1 configs upgrade as-is.
-
-Full summary: `changelogs/v1.5.0.md`.
+No breaking changes. See `changelogs/v1.5.1-beta.1.md` for the full changelog.
 
 
 ## 🧩 Platform feature snapshot
@@ -401,12 +405,6 @@ sudo mv cc-connect /usr/local/bin/
 git clone https://github.com/chenhg5/cc-connect.git
 cd cc-connect
 make build
-```
-
-To install the binary into Go's configured binary directory (`GOBIN`, or the first `GOPATH/bin`):
-
-```bash
-make install
 ```
 
 
