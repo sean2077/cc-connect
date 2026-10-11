@@ -44,10 +44,16 @@ func TestRotatingWriter(t *testing.T) {
 }
 
 func TestMetaSaveLoad(t *testing.T) {
-	origHome := os.Getenv("HOME")
 	dir := t.TempDir()
-	os.Setenv("HOME", dir)
-	defer os.Setenv("HOME", origHome)
+	t.Setenv("HOME", dir)
+	// os.UserHomeDir reads USERPROFILE on Windows, not HOME.
+	t.Setenv("USERPROFILE", dir)
+
+	// Check before writing so a broken home override cannot touch service metadata.
+	wantPath := filepath.Join(dir, ".cc-connect", "daemon.json")
+	if got := metaPath(); got != wantPath {
+		t.Fatalf("metadata path = %q, want temporary path %q", got, wantPath)
+	}
 
 	m := &Meta{
 		LogFile:       "/tmp/test.log",
@@ -55,7 +61,7 @@ func TestMetaSaveLoad(t *testing.T) {
 		LogMaxBackups: 3,
 		WorkDir:       "/tmp",
 		BinaryPath:    "/usr/local/bin/cc-connect",
-		InstalledAt:  NowISO(),
+		InstalledAt:   NowISO(),
 	}
 
 	if err := SaveMeta(m); err != nil {
@@ -72,6 +78,35 @@ func TestMetaSaveLoad(t *testing.T) {
 	}
 	if loaded.WorkDir != m.WorkDir {
 		t.Errorf("WorkDir mismatch: %s != %s", loaded.WorkDir, m.WorkDir)
+	}
+
+	RemoveMeta()
+	if _, err := os.Stat(wantPath); !os.IsNotExist(err) {
+		t.Fatalf("temporary metadata was not removed: %v", err)
+	}
+}
+
+func TestMetaSaveLoad_PreservesExistingServiceMetadata(t *testing.T) {
+	serviceHome := t.TempDir()
+	t.Setenv("HOME", serviceHome)
+	t.Setenv("USERPROFILE", serviceHome)
+	servicePath := filepath.Join(serviceHome, ".cc-connect", "daemon.json")
+	if err := os.MkdirAll(filepath.Dir(servicePath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	want := []byte(`{"work_dir":"existing-service","log_file":"service.log"}`)
+	if err := os.WriteFile(servicePath, want, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("isolated round trip", TestMetaSaveLoad)
+
+	got, err := os.ReadFile(servicePath)
+	if err != nil {
+		t.Fatalf("read existing service metadata: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("existing service metadata changed: got %q, want %q", got, want)
 	}
 }
 
