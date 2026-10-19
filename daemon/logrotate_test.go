@@ -44,10 +44,14 @@ func TestRotatingWriter(t *testing.T) {
 }
 
 func TestMetaSaveLoad(t *testing.T) {
+	// Redirect the data dir under a temp home. Setting HOME alone is not
+	// enough: os.UserHomeDir reads USERPROFILE on Windows, so this test used
+	// to call SaveMeta against the real ~/.cc-connect/daemon.json and
+	// overwrite it with the /tmp fixtures below — which silently disabled
+	// reapLeftoverFromMeta() on a live Windows install.
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
-	// os.UserHomeDir reads USERPROFILE on Windows, not HOME.
-	t.Setenv("USERPROFILE", dir)
+	t.Setenv("USERPROFILE", dir) // Windows os.UserHomeDir reads USERPROFILE
 
 	// Check before writing so a broken home override cannot touch service metadata.
 	wantPath := filepath.Join(dir, ".cc-connect", "daemon.json")
