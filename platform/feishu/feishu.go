@@ -2066,7 +2066,7 @@ func (p *Platform) dispatchMessageWithHistory(ctx context.Context, msgType, cont
 		})
 
 	case "post":
-		textParts, images := p.parsePostContent(messageID, content)
+		textParts, images := p.parsePostContent(messageID, content, mentions...)
 		text := stripMentions(strings.Join(textParts, "\n"), mentions, p.getBotOpenID())
 		// Top-level files[] of a rich-text post message were silently dropped
 		// before #1884 — the user could attach a file alongside text and the
@@ -2569,9 +2569,10 @@ func (p *Platform) fetchSingleMessage(ctx context.Context, messageID string) *ch
 		Code int `json:"code"`
 		Data struct {
 			Items []struct {
-				MsgType  string `json:"msg_type"`
-				ParentID string `json:"parent_id"`
-				Sender   struct {
+				MessageID string `json:"message_id"`
+				MsgType   string `json:"msg_type"`
+				ParentID  string `json:"parent_id"`
+				Sender    struct {
 					ID         string `json:"id"`
 					SenderType string `json:"sender_type"`
 				} `json:"sender"`
@@ -2587,9 +2588,21 @@ func (p *Platform) fetchSingleMessage(ctx context.Context, messageID string) *ch
 		return nil
 	}
 
+	// Prefer the item matching the requested message ID. Get-message for a
+	// merge_forward root returns the root plus all sub-messages; Items[0] may
+	// be a child, which would make the quote look like a random sub-message.
 	item := resp.Data.Items[0]
+	for _, candidate := range resp.Data.Items {
+		if candidate.MessageID == messageID {
+			item = candidate
+			break
+		}
+	}
+
 	content := item.Body.Content
-	if content == "" {
+	// merge_forward body is a fixed placeholder ("Merged and Forwarded Message");
+	// real content lives in sub-messages and must be fetched separately.
+	if content == "" && item.MsgType != "merge_forward" {
 		return nil
 	}
 
@@ -2664,6 +2677,16 @@ func (p *Platform) fetchSingleMessage(ctx context.Context, messageID string) *ch
 		}
 	case "interactive":
 		text = extractInteractiveCardText(content)
+	case "merge_forward":
+		// Expanding the forward is required when the user replies to a
+		// merge_forward: the reply arrives with a newer create_time and can
+		// set the engine watermark before the async merge_forward dispatch
+		// finishes, causing the standalone forward event to be dropped as
+		// stale. Without this expansion the agent only sees "[merge_forward]".
+		text, images, _ = p.parseMergeForward(messageID)
+		if text == "" {
+			text = "[merge_forward]"
+		}
 	default:
 		text = fmt.Sprintf("[%s]", item.MsgType)
 	}
@@ -4265,11 +4288,15 @@ var (
 	transientRetryMaxDelay = 5 * time.Second
 )
 
-// isTransientError returns true if the error is a transient network error
-// that warrants a retry (connection reset, timeout, EOF, etc.).
+// isTransientError returns true for retryable network failures and internal
+// errors from idempotent card updates.
 func isTransientError(err error) bool {
 	if err == nil {
 		return false
+	}
+	var cardErr *feishuCardAPIError
+	if errors.As(err, &cardErr) && cardErr.Code == 2200 {
+		return true
 	}
 	// Typed syscall checks — more robust than string matching.
 	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
@@ -5481,7 +5508,7 @@ func (p *Platform) patchCardMessage(ctx context.Context, messageID, cardJSON str
 				return fmt.Errorf("%s: patch message: %w", p.tag(), err)
 			}
 			if !resp.Success() {
-				return fmt.Errorf("%s: patch message code=%d msg=%s", p.tag(), resp.Code, resp.Msg)
+				return fmt.Errorf("%s: %w", p.tag(), classifyFeishuCardAPIError("patch message", resp.Code, resp.Msg))
 			}
 			return nil
 		})
@@ -5755,17 +5782,17 @@ type postLang struct {
 // parsePostContent handles both formats of feishu post content:
 // 1. {"title":"...", "content":[[...]]}  (receive event)
 // 2. {"zh_cn":{"title":"...", "content":[[...]]}}  (some SDK versions)
-func (p *Platform) parsePostContent(messageID, raw string) ([]string, []core.ImageAttachment) {
+func (p *Platform) parsePostContent(messageID, raw string, mentions ...*larkim.MentionEvent) ([]string, []core.ImageAttachment) {
 	// try flat format first
 	var flat postLang
 	if err := json.Unmarshal([]byte(raw), &flat); err == nil && flat.Content != nil {
-		return p.extractPostParts(messageID, &flat)
+		return p.extractPostParts(messageID, &flat, mentions...)
 	}
 	// try language-keyed format
 	var langMap map[string]postLang
 	if err := json.Unmarshal([]byte(raw), &langMap); err == nil {
 		for _, lang := range langMap {
-			return p.extractPostParts(messageID, &lang)
+			return p.extractPostParts(messageID, &lang, mentions...)
 		}
 	}
 	slog.Error(p.tag()+": failed to parse post content", "raw", raw)
@@ -5790,7 +5817,7 @@ func (p *Platform) parsePostFiles(raw string) []postFile {
 	return nil
 }
 
-func (p *Platform) extractPostParts(messageID string, post *postLang) ([]string, []core.ImageAttachment) {
+func (p *Platform) extractPostParts(messageID string, post *postLang, mentions ...*larkim.MentionEvent) ([]string, []core.ImageAttachment) {
 	var textParts []string
 	var images []core.ImageAttachment
 	if post.Title != "" {
@@ -5819,7 +5846,7 @@ func (p *Platform) extractPostParts(messageID string, post *postLang) ([]string,
 					textParts = append(textParts, elem.Text)
 				}
 			case "at":
-				if p.getBotOpenID() != "" && elem.UserId == p.getBotOpenID() {
+				if isPostBotMention(elem.UserId, p.getBotOpenID(), mentions) {
 					continue
 				}
 				switch {
@@ -5843,6 +5870,24 @@ func (p *Platform) extractPostParts(messageID string, post *postLang) ([]string,
 		}
 	}
 	return textParts, images
+}
+
+// Rich-text events can use a mention placeholder rather than an OpenID in an
+// at element. Resolve its identity before rendering it as a display name.
+func isPostBotMention(userID, botOpenID string, mentions []*larkim.MentionEvent) bool {
+	if botOpenID == "" {
+		return false
+	}
+	if userID == botOpenID {
+		return true
+	}
+	for _, mention := range mentions {
+		if mention != nil && mention.Key != nil && *mention.Key == userID &&
+			mention.Id != nil && mention.Id.OpenId != nil && *mention.Id.OpenId == botOpenID {
+			return true
+		}
+	}
+	return false
 }
 
 // onBotMenu handles bot custom menu click events. When a menu item's
